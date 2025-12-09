@@ -7,7 +7,7 @@ name = "purelypdb"
 version = "1.0.0"
 description = "Cross-platform Python parser for Microsoft PDB files with no external dependencies"
 readme = "README.md"
-license = "GPLv2"
+license = {text = "GPL-2.0-only"}
 authors = [
     {name = "saileaxh"}
 ]

@@ -1,6 +1,10 @@
 # PurelyPDB
 
-A pure Python library for parsing Microsoft PDB (Program Database) files.
+Cross-platform Python parser for Microsoft PDB files with no external dependencies.
+
+Based on [pdbparse](https://github.com/moyix/pdbparse) with modifications and additional code.
+
+Provides more complete parsing support, primarily supporting 3.7-latest, with secondary support for 2.7+.
 
 ## Features
 
@@ -22,78 +26,43 @@ Or install from source:
 pip install -e .
 ```
 
-## Quick Start
-
-### Parse Functions
+## Usage
 
 ```python
-from purelypdb import parse
+from purelypdb import parse, get_type_size
 
+# Parse a PDB file
 pdb = parse("example.pdb")
 
-# Get section headers for address calculation
-sections = pdb.STREAM_SECT_HDR.sections if hasattr(pdb, 'STREAM_SECT_HDR') else []
-
-# Get function sizes
-func_sizes = pdb.STREAM_GSYM.func_sizes if hasattr(pdb, 'STREAM_GSYM') else {}
-
-# Iterate over global symbols
+# Access global symbols
 for sym in pdb.STREAM_GSYM.globals:
-    # Check if it's a function (S_PUB32 with function flag)
-    if sym.leaf_type == 0x110E and (sym.symtype & 0x02):
-        seg = sym.segment
-        off = sym.offset
-        
-        # Calculate virtual address
-        if sections and 0 < seg <= len(sections):
-            va = sections[seg-1].VirtualAddress + off
-        else:
-            va = off
-        
-        # Get function size
-        size = func_sizes.get((seg, off), 0)
-        
-        print(f"{sym.name} VA=0x{va:08X} Size={size}")
+    print(sym.name, sym.offset)
+
+# Access section headers
+for sec in pdb.STREAM_SECT_HDR.sections:
+    print(sec.Name, sec.VirtualAddress)
+
+# Get type size
+size = get_type_size(pdb.STREAM_TPI.types, typind)
 ```
 
-### Parse Variables
+## API
 
-```python
-from purelypdb import parse
+| Function | Parameters | Returns | Description |
+|----------|-----------|---------|-------------|
+| `parse(filename, fast_load=False)` | `filename`: PDB file path<br>`fast_load`: Skip some streams | PDB object | Parse PDB file (auto-detect version) |
+| `get_type_size(tpi_types, typind)` | `tpi_types`: Types from STREAM_TPI<br>`typind`: Type index | int | Get type size in bytes |
 
-pdb = parse("example.pdb")
+### PDB Object Attributes
 
-# Data symbol types
-S_GDATA32 = 0x110D
-S_LDATA32 = 0x110C
-
-for sym in pdb.STREAM_GSYM.globals:
-    if sym.leaf_type in (S_GDATA32, S_LDATA32):
-        # Get type size from TPI stream
-        typind = sym.symtype
-        size = 0
-        
-        if hasattr(pdb, 'STREAM_TPI') and typind in pdb.STREAM_TPI.types:
-            t = pdb.STREAM_TPI.types[typind]
-            size = getattr(t, 'size', 0)
-        
-        print(f"{sym.name} typind=0x{typind:X} Size={size}")
-```
-
-### Parse Segments
-
-```python
-from purelypdb import parse
-
-pdb = parse("example.pdb")
-
-if hasattr(pdb, 'STREAM_SECT_HDR'):
-    for i, sec in enumerate(pdb.STREAM_SECT_HDR.sections):
-        print(f"Section {i+1}: {sec.Name}")
-        print(f"  VirtualAddress: 0x{sec.VirtualAddress:08X}")
-        print(f"  VirtualSize: 0x{sec.VirtualSize:08X}")
-        print(f"  PointerToRawData: 0x{sec.PointerToRawData:08X}")
-```
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `STREAM_GSYM` | Stream | Global symbols |
+| `STREAM_GSYM.globals` | List | List of symbol objects |
+| `STREAM_SECT_HDR` | Stream | Section headers |
+| `STREAM_SECT_HDR.sections` | List | List of section objects |
+| `STREAM_TPI` | Stream | Type information |
+| `STREAM_TPI.types` | Dict | Type index to type mapping |
 
 ## Symbol Types
 
@@ -106,7 +75,13 @@ if hasattr(pdb, 'STREAM_SECT_HDR'):
 | S_LPROC32 | 0x110F | Local procedure |
 | S_GPROC32_ID | 0x1127 | Global procedure (ID version) |
 | S_LPROC32_ID | 0x1128 | Local procedure (ID version) |
+| S_GDATA32_ST | 0x1009 | Global data (ST version) |
+| S_LDATA32_ST | 0x1008 | Local data (ST version) |
+| S_GPROC32_ST | 0x100A | Global procedure (ST version) |
+| S_LPROC32_ST | 0x100B | Local procedure (ST version) |
+| S_PROCREF | 0x1125 | Procedure reference |
+| S_LPROCREF | 0x1126 | Local procedure reference |
 
 ## License
 
-MIT License
+GPL v2
